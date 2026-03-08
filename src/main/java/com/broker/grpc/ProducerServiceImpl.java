@@ -5,12 +5,14 @@ import com.proto.ProducerProto;
 import com.proto.ProducerServiceGrpc;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public class ProducerServiceImpl extends ProducerServiceGrpc.ProducerServiceImplBase {
 
-    private final PartitionManager partitionManager;
+    private final AtomicReference<PartitionManager> partitionManagerRef;
 
-    public ProducerServiceImpl(PartitionManager partitionManager) {
-        this.partitionManager = partitionManager;
+    public ProducerServiceImpl(AtomicReference<PartitionManager> partitionManagerRef) {
+        this.partitionManagerRef = partitionManagerRef;
     }
 
     @Override
@@ -22,13 +24,13 @@ public class ProducerServiceImpl extends ProducerServiceGrpc.ProducerServiceImpl
 
             @Override
             public void onNext(ProducerProto.ProducerEvent event) {
+                PartitionManager pm = partitionManagerRef.get();
+                if (pm == null) {
+                    responseObserver.onError(new RuntimeException("Broker not initialized yet. POST /config first."));
+                    return;
+                }
                 eventCount++;
-                // Hand event off to PartitionManager — assigns to correct partition
-                partitionManager.assign(
-                        event.getKey(),
-                        event.getValue(),
-                        event.getTimestamp()
-                );
+                pm.assign(event.getKey(), event.getValue(), event.getTimestamp());
             }
 
             @Override

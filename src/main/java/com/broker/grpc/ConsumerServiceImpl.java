@@ -6,17 +6,25 @@ import com.proto.ConsumerProto;
 import com.proto.ConsumerServiceGrpc;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public class ConsumerServiceImpl extends ConsumerServiceGrpc.ConsumerServiceImplBase {
 
-    private final PartitionManager partitionManager;
+    private final AtomicReference<PartitionManager> partitionManagerRef;
 
-    public ConsumerServiceImpl(PartitionManager partitionManager) {
-        this.partitionManager = partitionManager;
+    public ConsumerServiceImpl(AtomicReference<PartitionManager> partitionManagerRef) {
+        this.partitionManagerRef = partitionManagerRef;
     }
 
     @Override
     public void subscribeToPartition(ConsumerProto.SubscribeRequest request,
                                      StreamObserver<ConsumerProto.Event> responseObserver) {
+
+        PartitionManager partitionManager = partitionManagerRef.get();
+        if (partitionManager == null) {
+            responseObserver.onError(new RuntimeException("Broker not initialized yet. POST /config first."));
+            return;
+        }
 
         int partitionId = request.getPartition();
         String consumerGroup = request.getConsumerGroup();
@@ -25,15 +33,11 @@ public class ConsumerServiceImpl extends ConsumerServiceGrpc.ConsumerServiceImpl
 
         System.out.println(consumerName + " (" + consumerGroup + ") subscribed to partition " + partitionId + " from offset " + offset);
 
-        // Each subscription runs in its own thread
-        // Otherwise this would block the gRPC thread and no other consumers could connect
         Thread consumerThread = new Thread(() -> {
             try {
                 while (true) {
-                    // Blocks until an event is available in this partition
                     Event event = partitionManager.poll(partitionId);
 
-                    // Build the proto Event to send back to the consumer
                     ConsumerProto.Event protoEvent = ConsumerProto.Event.newBuilder()
                             .setKey(event.getKey())
                             .setValue(event.getValue())
@@ -42,7 +46,6 @@ public class ConsumerServiceImpl extends ConsumerServiceGrpc.ConsumerServiceImpl
                             .setTimestamp(event.getTimestamp())
                             .build();
 
-                    // Stream event to consumer
                     responseObserver.onNext(protoEvent);
                 }
             } catch (InterruptedException e) {
@@ -51,7 +54,7 @@ public class ConsumerServiceImpl extends ConsumerServiceGrpc.ConsumerServiceImpl
             }
         });
 
-        consumerThread.setDaemon(true); // dies when broker shuts down
+        consumerThread.setDaemon(true);
         consumerThread.start();
     }
 }

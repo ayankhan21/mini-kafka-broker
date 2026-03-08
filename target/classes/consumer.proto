@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option java_package = "com.proto";
+option java_outer_classname = "ConsumerProto";
+
+service ConsumerService {
+  // Server-side streaming: consumer subscribes to a partition, broker streams events as they arrive
+  rpc SubscribeToPartition(SubscribeRequest) returns (stream Event);
+}
+
+message SubscribeRequest {
+  string consumer_group = 1;   // e.g. "orders-group"
+  string consumer_name = 2;    // e.g. "orders-service"
+  int32 partition = 3;         // which partition this thread is subscribing to
+  int64 offset = 4;            // resume from this offset (0 if fresh start)
+}
+
+message Event {
+  string key = 1;              // e.g. "user_121212"
+  string value = 2;            // event payload
+  int64 offset = 3;            // position of this event in the partition
+  int32 partition = 4;         // which partition this came from
+  int64 timestamp = 5;         // epoch millis
+}
+

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option java_package = "com.proto";
+option java_outer_classname = "ProducerProto";
+
+service ProducerService {
+  // Client-side streaming: producer continuously streams events to broker
+  rpc StreamEvents(stream ProducerEvent) returns (Ack);
+}
+
+message ProducerEvent {
+  string key = 1;        // e.g. "user_121212" — used for partition assignment (hash % partitions)
+  string value = 2;      // e.g. { "orderId": "123", "product": "iPhone 15", "amount": 4999 }
+  int64 timestamp = 3;   // epoch millis
+}
+
+message Ack {
+  bool success = 1;
+  string message = 2;
+}

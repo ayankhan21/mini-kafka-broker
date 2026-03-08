@@ -7,32 +7,29 @@ import com.broker.partition.PartitionManager;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public class BrokerMain {
 
     public static void main(String[] args) throws Exception {
 
-        // Read partition count from env, default to 3
-        int partitionCount = Integer.parseInt(
-                System.getenv().getOrDefault("PARTITION_COUNT", "3")
-        );
+        // Shared reference — null until dashboard POSTs /config
+        AtomicReference<PartitionManager> partitionManagerRef = new AtomicReference<>(new PartitionManager(3));
 
-        // 1. Initialize partition manager — creates N BlockingQueues
-        PartitionManager partitionManager = new PartitionManager(partitionCount);
-
-        // 2. Start REST server for GET /config
-        ConfigHttpServer configHttpServer = new ConfigHttpServer(partitionManager);
+        // Start REST server — handles POST /config to initialize broker
+        ConfigHttpServer configHttpServer = new ConfigHttpServer(partitionManagerRef);
         configHttpServer.start();
 
-        // 3. Start gRPC server with both services registered
+        // Start gRPC server — services will reject requests until partitionManager is set
         Server grpcServer = ServerBuilder.forPort(9090)
-                .addService(new ProducerServiceImpl(partitionManager))
-                .addService(new ConsumerServiceImpl(partitionManager))
+                .addService(new ProducerServiceImpl(partitionManagerRef))
+                .addService(new ConsumerServiceImpl(partitionManagerRef))
                 .build();
 
         grpcServer.start();
-        System.out.println("Broker gRPC server started on port 9090");
+        System.out.println("Broker started with default 3 partitions. Override via POST /config before starting stream.");
+        System.out.println("Waiting for partition config via POST /config on port 8080...");
 
-        // 4. Keep alive until killed
         grpcServer.awaitTermination();
     }
 }
