@@ -31,6 +31,7 @@ public class PartitionManager {
         BlockingQueue<Event> queue = partitions.get(partitionId);
         Event event = new Event(key, value, timestamp, partitionId);
         queue.offer(event);
+//        System.out.println("Event assigned to partition " + partitionId + " | key: " + key); // add this
     }
 
     // Called by ConsumerServiceImpl to pull next event for a given partition
