@@ -46,7 +46,13 @@ public class ConsumerServiceImpl extends ConsumerServiceGrpc.ConsumerServiceImpl
                             .setTimestamp(event.getTimestamp())
                             .build();
 
-                    responseObserver.onNext(protoEvent);
+                    try {
+                        responseObserver.onNext(protoEvent);
+                    } catch (Exception e) {
+                        // Consumer disconnected, stop this thread silently
+                        System.out.println("Consumer disconnected from partition " + partitionId + ", stopping stream.");
+                        return;
+                    }
                 }
             } catch (InterruptedException e) {
                 System.out.println("Consumer thread interrupted for partition " + partitionId);
