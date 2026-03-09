@@ -24,6 +24,18 @@ public class ConfigHttpServer {
 
         // GET /config — returns current config if initialized
         server.createContext("/config", exchange -> {
+
+            // Handle CORS preflight
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
+
+            if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
+                exchange.sendResponseHeaders(204, -1);
+                exchange.getResponseBody().close();
+                return;
+            }
+
             if (exchange.getRequestMethod().equalsIgnoreCase("GET")) {
                 PartitionManager pm = partitionManagerRef.get();
                 String response;
@@ -45,6 +57,7 @@ public class ConfigHttpServer {
 
                 // POST /config — initializes PartitionManager with given partition count
             } else if (exchange.getRequestMethod().equalsIgnoreCase("POST")) {
+                System.out.println("POST /config received. Body will follow...");
                 InputStream is = exchange.getRequestBody();
                 String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
 
